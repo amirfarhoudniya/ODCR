@@ -146,33 +146,6 @@ $ns initial_node_pos $n(15) 20
 # $ns at 0.3 " $n(0) setdest 600 600 10 " 
 # $ns at 0.5 " $n(1) setdest 700 500 20 " 
 
-
-
-#===================================
-#        Agents Definition        
-#===================================
-#Setup a UDP connection
-set udp14 [new Agent/UDP]
-$ns attach-agent $n(14) $udp14
-set null17 [new Agent/Null]
-$ns attach-agent $n(1) $null17
-$ns connect $udp14 $null17
-$udp14 set packetSize_ 1500
-
-
-#===================================
-#        Applications Definition        
-#===================================
-#Setup a CBR Application over UDP connection
-set cbr0 [new Application/Traffic/CBR]
-$cbr0 attach-agent $udp14
-$cbr0 set packetSize_ 1000
-$cbr0 set rate_ 1.0Mb
-$cbr0 set random_ null
-$ns at 1.0 "$cbr0 start"
-$ns at 10.0 "$cbr0 stop"
-
-
 #===================================
 #       Energy sets
 #===================================
@@ -206,9 +179,11 @@ array set node_X1_Position {}
 array set node_Y1_Position {}
 array set node_X2_Position {}
 array set node_Y2_Position {}
+array set clusterHeads {} 
 set globalNMC 0
 set nodesList {n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16}
-
+array set cbr {}
+array set udp {}
 #===================================
 #          Node's Position
 #===================================
@@ -250,23 +225,6 @@ proc calculateDistance {node1 node2} {
     set distance [expr {sqrt(pow($node1_X - $node2_X, 2) + pow($node1_Y - $node2_Y, 2))}]
     return $distance
 }
-
-# set d [calculateDistance $n(1) $n(2)]
-# puts "distance is : $d"
-
-#we have logical error in proc below
-#it seems we should change the communication calculation
-# proc calculateCommunicationRange {txPower rxSensitivity pathLossExponent} {
-#     set lambda [expr {3e8 / 2.4e9}]  ;# Wavelength for 2.4 GHz frequency
-
-#     # Make rxSensitivity positive
-#     set absRxSensitivity [expr {abs($rxSensitivity)}]
-
-#     # Calculate the communication range
-#     set communicationRange [expr {sqrt(($txPower / $absRxSensitivity) * pow(($lambda / (4 * 3.14159)), 2) * pow(10, $pathLossExponent / 10))}]
-
-#     return $communicationRange
-# }
 
 proc calculateVelocity {node} {
     
@@ -402,7 +360,7 @@ calculateWeight
 #        clustring        
 #===================================
 proc setCluster {} {
-    global n weight
+    global n weight clusterHeads
 
     set minWeight 5000
     set minWeightNode 5000
@@ -417,6 +375,7 @@ proc setCluster {} {
     puts "the minWight is node($minWeightNode)"
     puts "the minimum weight is : $minWeight"
     $n($minWeightNode) color "red"
+    set clusterHeads(1) $minWeightNode
 
     set minWeight 5000
     set minWeightNode 5000
@@ -431,12 +390,72 @@ proc setCluster {} {
     puts "the minWight is node($minWeightNode)"
     puts "the minimum weight is : $minWeight"
     $n($minWeightNode) color "red"
+    set clusterHeads(2) $minWeightNode
     
 
 }
 
 setCluster
-# $ns at 0.1 setCluster
+$ns at 0.1 setCluster
+
+#===================================
+#           send packet        
+#===================================
+proc sendPacket {} {
+    global n clusterHeads ns cbr udp
+
+    for {set i 0} {$i < 8} {incr i} {
+        set udp($i) [new Agent/UDP]
+        $ns attach-agent $n($i) $udp($i)
+        set null($clusterHeads(1)) [new Agent/Null]
+        $ns attach-agent $n($clusterHeads(1)) $null($clusterHeads(1))
+        $ns connect $udp($i) $null($clusterHeads(1))
+        $udp($i) set packetSize_ 1500
+    }
+
+    for {set i 0} {$i < 8} {incr i} {
+        #Setup a CBR Application over UDP connection
+        set cbr($i) [new Application/Traffic/CBR]
+        $cbr($i) attach-agent $udp($i)
+        $cbr($i) set packetSize_ 1000
+        $cbr($i) set rate_ 1.0Mb
+        $cbr($i) set random_ null
+    }
+
+    for {set i 8} {$i < 16} {incr i} {
+        set udp($i) [new Agent/UDP]
+        $ns attach-agent $n($i) $udp($i)
+        set null($clusterHeads(2)) [new Agent/Null]
+        $ns attach-agent $n($clusterHeads(2)) $null($clusterHeads(2))
+        $ns connect $udp($i) $null($clusterHeads(2))
+        $udp($i) set packetSize_ 1500
+    }
+
+    for {set i 8} {$i < 16} {incr i} {
+        #Setup a CBR Application over UDP connection
+        set cbr($i) [new Application/Traffic/CBR]
+        $cbr($i) attach-agent $udp($i)
+        $cbr($i) set packetSize_ 1000
+        $cbr($i) set rate_ 1.0Mb
+        $cbr($i) set random_ null
+    }
+
+    $ns at 1.3 "$cbr(5) start"
+    $ns at 3.0 "$cbr(5) stop"
+
+    $ns at 1.0 "$cbr(3) start"
+    $ns at 2.0 "$cbr(3) stop"
+
+    $ns at 1.5 "$cbr(10) start"
+    $ns at 4.0 "$cbr(10) stop"
+
+    $ns at 0.7 "$cbr(13) start"
+    $ns at 3.5 "$cbr(13) stop"
+}
+
+$ns at 0.2 sendPacket
+
+
 
 #===================================
 #        Termination        
