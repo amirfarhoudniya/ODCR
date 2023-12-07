@@ -10,10 +10,10 @@ set val(ll)     LL                         ;# link layer type
 set val(ant)    Antenna/OmniAntenna        ;# antenna model
 set val(ifqlen) 50                         ;# max packet in ifq
 set val(nn)     16                         ;# number of mobilenodes
-set val(rp)     DSR                       ;# routing protocol
+set val(rp)     DSDV                       ;# routing protocol
 set val(x)      1400                      ;# X dimension of topography
 set val(y)      901                      ;# Y dimension of topography
-set val(stop)   10.0                         ;# time of simulation end
+set val(stop)   250.0                         ;# time of simulation end
 
 #===================================
 #        Initialization        
@@ -22,13 +22,14 @@ set val(stop)   10.0                         ;# time of simulation end
 set ns [new Simulator]
 
 #Setup topography object
-set topo       [new Topography]
+set topo [new Topography]
 $topo load_flatgrid $val(x) $val(y)
 create-god $val(nn)
 
 #Open the NS trace file
 set tracefile [open code.tr w]
 $ns trace-all $tracefile
+$ns use-newtrace
 
 #Open the NAM trace file
 set namfile [open code.nam w]
@@ -51,8 +52,8 @@ $ns node-config -adhocRouting  $val(rp) \
                 -energyModel "EnergyModel" \
 		        -initialEnergy 100.0 \
 			    -txPower 0.9 \
-			    -rxPower 0.7 \
-			    -idlePower 0.6 \
+			    -rxPower 0.4 \
+			    -idlePower 0.1 \
 		        -sleepPower 0.1 \
                 -topoInstance  $topo \
                 -agentTrace    ON \
@@ -188,7 +189,6 @@ array set node_X2_Position {}
 array set node_Y2_Position {}
 global set clusterHeads  
 set globalNMC 0
-set nodesList {n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16}
 array set cbr {}
 array set udp {}
 #===================================
@@ -356,7 +356,7 @@ $ns at 0.1 setCluster
 #===================================
 #           send packet        
 #===================================
-proc sendPacket {} {
+proc sendPacket1 {} {
     global n clusterHeads ns cbr udp
 
     for {set i 0} {$i < 16} {incr i} {
@@ -365,32 +365,72 @@ proc sendPacket {} {
         set null($clusterHeads) [new Agent/Null]
         $ns attach-agent $n($clusterHeads) $null($clusterHeads)
         $ns connect $udp($i) $null($clusterHeads)
-        $udp($i) set packetSize_ 1500
+        $udp($i) set packetSize_ 1024
     }
 
     for {set i 0} {$i < 16} {incr i} {
         #Setup a CBR Application over UDP connection
         set cbr($i) [new Application/Traffic/CBR]
         $cbr($i) attach-agent $udp($i)
-        $cbr($i) set packetSize_ 1000
-        $cbr($i) set rate_ 1.0Mb
+        $cbr($i) set packetSize_ 1024
+        $cbr($i) set rate_ 250kb
         $cbr($i) set random_ null
     }
 
-    $ns at 1.3 "$cbr(5) start"
-    $ns at 3.0 "$cbr(5) stop"
-
-    $ns at 1.0 "$cbr(3) start"
-    $ns at 2.0 "$cbr(3) stop"
-
-    $ns at 0.8 "$cbr(9) start"
-    $ns at 4.0 "$cbr(9) stop"
-
-    $ns at 0.7 "$cbr(13) start"
-    $ns at 3.5 "$cbr(13) stop"
+    $ns at 0.6 "$cbr(6) start"  
 }
 
-$ns at 0.2 sendPacket
+proc sendPacket2 {} {
+    global n clusterHeads ns cbr udp
+
+    for {set i 0} {$i < 16} {incr i} {
+        set udp($i) [new Agent/UDP]
+        $ns attach-agent $n($i) $udp($i)
+        set null($clusterHeads) [new Agent/Null]
+        $ns attach-agent $n($clusterHeads) $null($clusterHeads)
+        $ns connect $udp($i) $null($clusterHeads)
+        $udp($i) set packetSize_ 1024
+    }
+
+    for {set i 0} {$i < 16} {incr i} {
+        #Setup a CBR Application over UDP connection
+        set cbr($i) [new Application/Traffic/CBR]
+        $cbr($i) attach-agent $udp($i)
+        $cbr($i) set packetSize_ 1024
+        $cbr($i) set rate_ 250kb
+        $cbr($i) set random_ null
+    }
+
+    $ns at 1.0 "$cbr(3) start" 
+}
+
+proc sendPacket3 {} {
+    global n clusterHeads ns cbr udp
+
+    for {set i 0} {$i < 16} {incr i} {
+        set udp($i) [new Agent/UDP]
+        $ns attach-agent $n($i) $udp($i)
+        set null($clusterHeads) [new Agent/Null]
+        $ns attach-agent $n($clusterHeads) $null($clusterHeads)
+        $ns connect $udp($i) $null($clusterHeads)
+        $udp($i) set packetSize_ 1024
+    }
+
+    for {set i 0} {$i < 16} {incr i} {
+        #Setup a CBR Application over UDP connection
+        set cbr($i) [new Application/Traffic/CBR]
+        $cbr($i) attach-agent $udp($i)
+        $cbr($i) set packetSize_ 1024
+        $cbr($i) set rate_ 250kb
+        $cbr($i) set random_ null
+    }
+
+    $ns at 2.0 "$cbr(2) start"    
+}
+
+$ns at 0.2 sendPacket1
+$ns at 0.5 sendPacket2
+$ns at 0.9 sendPacket3
 
 
 
